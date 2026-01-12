@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Al-Kasav Smart Irrigation System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial;background:#e8f5e9;margin:0;padding:10px;}
+.card{background:white;padding:15px;border-radius:10px;margin-bottom:10px;box-shadow:0 0 5px #aaa;}
+h2{color:#2e7d32;}
+.big{font-size:20px;font-weight:bold;}
+.green{color:#2e7d32;}
+.red{color:red;}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h2>🌾 Al-Kasav Smart Irrigation System</h2>
+কৃষকের নাম: <input id="farmer" value="" style="width:100%">
+</div>
+
+<div class="card" id="location">📍 লোকেশন ধরছি...</div>
+<div class="card" id="weather">🌦 আবহাওয়া লোড হচ্ছে...</div>
+<div class="card" id="water"></div>
+<div class="card" id="decision"></div>
+<div class="card" id="plan"></div>
+
+<script>
+navigator.geolocation.getCurrentPosition(pos=>{
+ let lat=pos.coords.latitude;
+ let lon=pos.coords.longitude;
+ document.getElementById("location").innerHTML=
+ "📍 Latitude: "+lat.toFixed(2)+" , Longitude: "+lon.toFixed(2);
+
+ fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&daily=temperature_2m_max,precipitation_sum&timezone=auto`)
+ .then(r=>r.json()).then(d=>{
+
+ let T=d.current.temperature_2m;
+ let H=d.current.relative_humidity_2m;
+ let W=d.current.wind_speed_10m;
+ let R=d.current.precipitation;
+
+ // Evaporation
+ let E=(T*W)/H;
+ // Condensation
+ let C=(H/100)*(25/T);
+
+ let net=E-C-R;
+ if(net<0) net=0;
+
+ let soil=100 - net*10;
+ if(soil<0) soil=0;
+ if(soil>100) soil=100;
+
+ document.getElementById("weather").innerHTML=
+ `🌡 তাপমাত্রা: ${T}°C<br>💧 আর্দ্রতা: ${H}%<br>🌬 বাতাস: ${W} km/h<br>🌧 বৃষ্টি: ${R} mm`;
+
+ document.getElementById("water").innerHTML=
+ `🔥 বাষ্পীভবন: ${E.toFixed(2)} mm<br>
+ ☁️ ঘনীভবন: ${C.toFixed(2)} mm<br>
+ 💧 নেট পানি ক্ষতি: ${net.toFixed(2)} mm<br>
+ 🌍 মাটির পানি: ${soil.toFixed(0)}%`;
+
+ let msg="";
+ if(soil<40) msg="🔴 আজ 45 মিনিট সেচ দিন";
+ else if(soil<60) msg="🟡 25 মিনিট সেচ দিন";
+ else msg="🟢 আজ সেচ দরকার নেই";
+
+ document.getElementById("decision").innerHTML=
+ `<span class="big">${msg}</span>`;
+
+ let p="";
+ for(let i=0;i<7;i++){
+  let rain=d.daily.precipitation_sum[i];
+  let temp=d.daily.temperature_2m_max[i];
+  if(rain>5) p+="দিন "+(i+1)+": বৃষ্টি – সেচ বন্ধ<br>";
+  else if(temp>33) p+="দিন "+(i+1)+": গরম – সেচ দিন<br>";
+  else p+="দিন "+(i+1)+": হালকা সেচ<br>";
+ }
+ document.getElementById("plan").innerHTML="📅 ৭ দিনের সেচ পরিকল্পনা<br>"+p;
+ });
+});
+</script>
+
+</body>
+</html>
